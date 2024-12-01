@@ -36,7 +36,7 @@ app.get('/users', async (req, res) => {
 });
 
 // **Read** - GET request to get a user by email
-app.get('/users/:email', async (req, res) => {
+app.get('/users/:id', async (req, res) => {
   try {
     const user = await User.findOne({ email: req.params.email });
     if (!user) {
@@ -49,7 +49,7 @@ app.get('/users/:email', async (req, res) => {
 });
 
 // **Update** - PUT request to update a user's name by email
-app.put('/users/:email', async (req, res) => {
+app.put('/users/:id', async (req, res) => {
   try {
     const updatedUser = await User.findOneAndUpdate(
       { email: req.params.email }, // Find user by email
@@ -66,7 +66,7 @@ app.put('/users/:email', async (req, res) => {
 });
 
 // **Delete** - DELETE request to delete a user by email
-app.delete('/users/:email', async (req, res) => {
+app.delete('/users/:id', async (req, res) => {
   try {
     const result = await User.deleteOne({ email: req.params.email });
     if (result.deletedCount === 0) {
