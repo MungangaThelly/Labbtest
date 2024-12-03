@@ -1,45 +1,52 @@
 require('dotenv').config(); // Ensure .env is loaded
 const express = require('express');
 const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const User = require('./src/models/User'); // Import the User model
 
 const app = express();
 app.use(express.json()); // Middleware to parse JSON request bodies
 
-// Connect to MongoDB
+// Connect to MongoDB (Updated)
 mongoose.connect(process.env.MONGO_CONNECTION_STRING, {
-
+  useNewUrlParser: true,
+  useUnifiedTopology: true
 })
   .then(() => console.log('MongoDB connected'))
   .catch((err) => console.error('MongoDB connection error:', err));
 
-// **Create** - POST request to create a new user
-app.post('/users', async (req, res) => {
-    try {
-      const { username, password } = req.body;
-  
-      // Input validation: Ensure username and password are provided
-      if (!username || !password) {
-        return res.status(400).json({ message: 'Username and password are required' });
-      }
-  
-      // Create a new user instance
-      const newUser = new User({ username, password });
-  
-      // Save the new user to the database
-      await newUser.save();
-  
-      // Respond with the created user
-      res.status(201).json(newUser);
-    } catch (error) {
-      res.status(500).json({ message: 'Error creating user', error: error.message });
-    }
-  });
+// CORS Middleware
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  next();
+});
 
-  // **Login Route**
-app.post('/login', async (req, res) => {
+// **Create** - POST request to create a new user
+app.post('/MyDatabase/users', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ message: 'Username and password are required' });
+    }
+    
+    const newUser = new User({ username, password });
+    await newUser.save();
+    
+    res.status(201).json(newUser);
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ message: 'Error creating user', error: error.message });
+  }
+});
+
+// **Login Route**
+app.post('/MyDatabase/login', async (req, res) => {
   const { username, password } = req.body;
-  
+
   try {
     const user = await User.findOne({ username });
     if (!user) {
@@ -51,77 +58,75 @@ app.post('/login', async (req, res) => {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
-    // Generate JWT token
-    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: '1h' });
     res.json({ token });
   } catch (error) {
-    console.error(error);
+    console.error('Error during login:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 
-  
 // **Read** - GET request to get all users
-app.get('/users', async (req, res) => {
+app.get('/MyDatabase/users', async (req, res) => {
   try {
     const users = await User.find();
-    res.status(200).json(users); // Respond with all users
+    res.status(200).json(users);
   } catch (error) {
+    console.error('Error fetching users:', error);
     res.status(500).json({ message: 'Error fetching users', error: error.message });
   }
 });
 
 // **Read** - GET request to get a user by id 
-app.get('/users/:id', async (req, res) => {
-    try {
-      // Use `_id` for the MongoDB document's primary key
-      const user = await User.findById(req.params.id);
-  
-      if (!user) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-  
-      res.status(200).json(user); // Respond with the found user
-    } catch (error) {
-      res.status(500).json({ message: 'Error fetching user', error: error.message });
+app.get('/MyDatabase/users/:id', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
     }
-  });
-  
+    res.status(200).json(user);
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    res.status(500).json({ message: 'Error fetching user', error: error.message });
+  }
+});
 
 // **Update** - PUT request to update a user's name by id
-app.put('/users/:id', async (req, res) => {
-    try {
-      const updatedUser = await User.findByIdAndUpdate(
-        req.params.id, // Find user by _id
-        { username: req.body.username }, // Update username (you can also use other fields like `name`)
-        { new: true } // Return the updated document
-      );
-  
-      if (!updatedUser) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-  
-      res.status(200).json(updatedUser); // Respond with the updated user
-    } catch (error) {
-      res.status(500).json({ message: 'Error updating user', error: error.message });
+app.put('/MyDatabase/users/:id', async (req, res) => {
+  try {
+    const updatedUser = await User.findByIdAndUpdate(
+      req.params.id, 
+      { username: req.body.username }, 
+      { new: true }
+    );
+
+    if (!updatedUser) {
+      return res.status(404).json({ message: 'User not found' });
     }
-  });
-  
+
+    res.status(200).json(updatedUser);
+  } catch (error) {
+    console.error('Error updating user:', error);
+    res.status(500).json({ message: 'Error updating user', error: error.message });
+  }
+});
+
 // **Delete** - DELETE request to delete a user by id 
-app.delete('/users/:id', async (req, res) => {
-    try {
-      const result = await User.deleteOne({ _id: req.params.id }); // Use _id to find the user
-  
-      if (result.deletedCount === 0) {
-        return res.status(404).json({ message: 'User not found' });
-      }
-  
-      res.status(200).json({ message: 'User deleted' }); // Respond with success message
-    } catch (error) {
-      res.status(500).json({ message: 'Error deleting user', error: error.message });
+app.delete('/MyDatabase/users/:id', async (req, res) => {
+  try {
+    const result = await User.deleteOne({ _id: req.params.id });
+
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: 'User not found' });
     }
-  });
-  
+
+    res.status(200).json({ message: 'User deleted' });
+  } catch (error) {
+    console.error('Error deleting user:', error);
+    res.status(500).json({ message: 'Error deleting user', error: error.message });
+  }
+});
+
 // Start the server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
